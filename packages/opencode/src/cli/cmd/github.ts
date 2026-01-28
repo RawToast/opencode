@@ -443,6 +443,8 @@ export const GithubRunCommand = cmd({
       const isIssuesEvent = context.eventName === "issues"
       const isScheduleEvent = context.eventName === "schedule"
       const isWorkflowDispatchEvent = context.eventName === "workflow_dispatch"
+      const isPullRequestEvent = context.eventName === "pull_request"
+      const skipPullRequestComment = process.env["SKIP_PULL_REQUEST_COMMENT"] === "true"
 
       const { providerID, modelID } = normalizeModel()
       const runId = normalizeRunId()
@@ -580,8 +582,12 @@ export const GithubRunCommand = cmd({
               const summary = await summarize(response)
               await pushToLocalBranch(summary, uncommittedChanges)
             }
-            const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-            await createComment(`${response}${footer({ image: !hasShared })}`)
+            // Skip comment for pull_request events if SKIP_PULL_REQUEST_COMMENT is set
+            // (useful for automated reviewers that post their own review via tools)
+            if (!(isPullRequestEvent && skipPullRequestComment)) {
+              const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
+              await createComment(`${response}${footer({ image: !hasShared })}`)
+            }
             await removeReaction(commentType)
           }
           // Fork PR
@@ -595,8 +601,11 @@ export const GithubRunCommand = cmd({
               const summary = await summarize(response)
               await pushToForkBranch(summary, prData, uncommittedChanges)
             }
-            const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-            await createComment(`${response}${footer({ image: !hasShared })}`)
+            // Skip comment for pull_request events if SKIP_PULL_REQUEST_COMMENT is set
+            if (!(isPullRequestEvent && skipPullRequestComment)) {
+              const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
+              await createComment(`${response}${footer({ image: !hasShared })}`)
+            }
             await removeReaction(commentType)
           }
         }
